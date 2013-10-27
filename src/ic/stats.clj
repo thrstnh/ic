@@ -11,20 +11,37 @@
 (defn total-sha-1 "" [entries] (count (filter #(= % "sha-1") (map :algorithm entries))))
 (defn total-sha-256 "" [entries] (count (filter #(= % "sha-256") (map :algorithm entries))))
 (defn total-sha-512 "" [entries] (count (filter #(= % "sha-512") (map :algorithm entries))))
+
 (defn total-stats
-  "show stats of store with name"
+  "show stats for all entries"
   []
-  (let [entries (select-entries)
-        stats {:files (count entries)
-               :size (grab-unit (total-size entries))
-               :scantime-hr (htime (total-took entries))
-               :scantime-sec (ftime (total-took entries))
-               :hidden (total-hidden entries)
-               :r (total-read entries)
-               :w (total-write entries)
-               :x (total-execute entries)
-               :md5 (total-md5 entries)
-               :sha-1 (total-sha-1 entries)
-               :sha-256 (total-sha-256 entries)
-               :sha-512 (total-sha-512 entries)}]
-    (println "STATS\n" stats)))
+  (let [entries (select-entries)]
+    {:files (count entries)
+     :size (grab-unit (total-size entries))
+     :scantime-hr (htime (total-took entries))
+     :scantime-sec (ftime (total-took entries))
+     :hidden (total-hidden entries)
+     :r (total-read entries)
+     :w (total-write entries)
+     :x (total-execute entries)
+     :md5 (total-md5 entries)
+     :sha-1 (total-sha-1 entries)
+     :sha-256 (total-sha-256 entries)
+     :sha-512 (total-sha-512 entries)}))
+
+(defn store-stats
+  "show stats of store with name"
+  [path]
+  (let [entries (select-store path)]
+    {:files (count entries)
+     :size (grab-unit (total-size entries))
+     :scantime-hr (htime (total-took entries))
+     :scantime-sec (ftime (total-took entries))
+     :hidden (total-hidden entries)
+     :r (total-read entries)
+     :w (total-write entries)
+     :x (total-execute entries)
+     :md5 (total-md5 entries)
+     :sha-1 (total-sha-1 entries)
+     :sha-256 (total-sha-256 entries)
+     :sha-512 (total-sha-512 entries)}))

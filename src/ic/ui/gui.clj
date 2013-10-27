@@ -1,5 +1,5 @@
 (ns ic.ui.gui
-  (:use [ic db tools stores stats]
+  (:use [ic ic db tools stores stats]
         [seesaw core tree chooser]
         [clojure.java.jdbc :only (with-connection)]
         [clojure.tools.logging :only (info error)]
@@ -24,6 +24,8 @@
     :r :w :x
     :hidden))
 
+(def table-header-size [400 200 50 50 50 10 10 10 10])
+
 (def tree-model
   (simple-tree-model
     #(.isDirectory %)
@@ -44,6 +46,7 @@
       (menubar
         :id :menubar
         :items [(menu :id :menu-file)
+                (menu :id :menu-edit)
                 (menu :id :menu-help)])
     :content
       (border-panel
@@ -52,8 +55,13 @@
         :hgap h-gap 
         :vgap v-gap
         :north (horizontal-panel
-                 :items [(combobox :id :stores
-                                   :model (keys stores))])
+                 :id :store-bar
+                 :items [(label :id :store-label
+                                :text "store")
+                         (combobox :id :stores
+                                   :model (keys stores))
+                         (button :id :rescan
+                                 :text "rescan")])
         :west
           (tree
             :id :tree 
@@ -64,7 +72,8 @@
             (table
               :id :table
               :model [:columns table-header
-                      :rows []]))
+                      :rows []]
+              :column-widths table-header-size))
         :east
           (grid-panel
             :columns 2
@@ -74,14 +83,21 @@
             :items [(label :id :lpath) (text :id :path)
                     (label :id :lchecksum) (text :id :checksum)])
         :south
-          (text :id :status))))
+          (label :id :status :text "ready."))))
 
 (defn element [id] (select main-frame id))
 
+(defn selected-store
+  []
+  (let [store (selection (element [:#stores]) :text)
+        path (val (first (filter (fn [[key val]] (= key store)) stores)))]
+    {:store store :path path}))
+
 (defn update-status-bar
   []
-  (let [statusbar (element [:#status])]    
-  (config! statusbar :text (str (config statusbar :text) "."))))
+  (let [statusbar (element [:#status])]
+    (with-connection db
+      (config! statusbar :text (str (store-stats (:path (selected-store))))))))
 
 (defn fill-details
   [path checksum]
@@ -107,27 +123,33 @@
   (config!
     (element [:#table])
       :model [:columns table-header
-              :rows (prepare-table-data)]))
+              :rows (prepare-table-data)]
+      :column-widths table-header-size))
+
 
 (defn select-new-store
   "select a new directory to scan"
   []
-  (choose-file
-    :type :open
-    :multi? false
-    :selection-mode :dirs-only
-    :success-fn (fn [fc file] (.getAbsolutePath file))))
+  (let [path (choose-file
+               :type :open
+               :multi? false
+               :selection-mode :dirs-only
+               :success-fn (fn [fc file] (.getAbsolutePath file)))
+        name (input "what name for the store?")]
+    (info "TODO: new store")))
 
 
 (defn file-add [e] (select-new-store))
 (defn file-backup [e] (backup!))
 (defn file-exit [e] (System/exit 0))
 (defn help-root [e] (fill-details))
+(defn on-todo [e] (println "todo: " e))
 (defn help-root [e] (update-status-bar))
 (defn generate-menu
   []
   (let
     [menu-file (element [:#menu-file])
+     menu-edit (element [:#menu-edit])
      menu-help (element [:#menu-help])
      file-add (action :handler file-add
                       :name "add store"
@@ -138,6 +160,12 @@
      file-exit (action :handler file-exit
                        :name "exit"
                        :tip "exit ic")
+     edit-algorithm (action :handler on-todo
+                            :name "algorithm"
+                            :tip "set algorithm")
+     edit-clock (action :handler on-todo
+                        :name "interval"
+                        :tip "set rescan interval")
      help-root (action :handler help-root
                        :name "help"
                        :tip "help")
@@ -145,20 +173,29 @@
     (do
       (config! menu-file :text "file"
                          :items [file-add file-backup file-exit])
+      (config! menu-edit :text "edit"
+                         :items [edit-algorithm edit-clock])
       (config! menu-help :text "help"
                          :items [help-root]))))
 
-(defn it-works
+(defn change-store
   [e]
-  (let [store (selection (element [:#stores]) :text)
-        path (val (first (filter (fn [[key val]] (= key store)) stores)))]
     (with-connection db
-      (def ^:dynamic entries (select-store path)))
-    (fill-table)))
+      (do
+        (def ^:dynamic entries (select-store (:path (selected-store))))
+        (fill-table)
+        (update-status-bar))))
+
+(defn on-rescan
+  [e]
+  (with-connection db
+    (rescan (:store (selected-store)))))
 
 (defn init-stores
   []
-  (listen (element [:#stores]) :action it-works))
+  (do
+    (listen (element [:#stores]) :action change-store)
+    (listen (element [:#rescan]) :action on-rescan)))
 
 (defn switch-to-gui
   "run in gui mode"
