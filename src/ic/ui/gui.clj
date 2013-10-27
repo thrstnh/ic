@@ -93,11 +93,17 @@
         path (val (first (filter (fn [[key val]] (= key store)) stores)))]
     {:store store :path path}))
 
+(def delim "        ")
 (defn update-status-bar
   []
-  (let [statusbar (element [:#status])]
+  (let [statusbar (element [:#status])
+        stats (store-stats (:path (selected-store)))]
     (with-connection db
-      (config! statusbar :text (str (store-stats (:path (selected-store))))))))
+      (config! statusbar
+        :text (str "files: " (:files stats) delim
+                   "size: " (:size stats) delim
+                   "scantime: " (:scantime-hr stats) delim
+                   "hidden: " (:hidden stats))))))
 
 (defn fill-details
   [path checksum]
