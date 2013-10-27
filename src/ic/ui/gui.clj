@@ -186,10 +186,17 @@
         (fill-table)
         (update-status-bar))))
 
-(defn on-rescan
-  [e]
-  (with-connection db
-    (rescan (:store (selected-store)))))
+(defn non-blocking-rescan
+  []
+  (future
+    (config! (element [:#main-panel]) :cursor :wait)
+    (let [path (:store (selected-store))
+          result (with-connection db (rescan path))]
+      (invoke-later
+        (alert :text (str "rescan done...: " result))
+        (config! (element [:#main-panel]) :cursor :default)))))
+
+(defn on-rescan [e] (non-blocking-rescan))
 
 (defn init-stores
   []
