@@ -15,7 +15,7 @@
 (defn load-entries []
   (with-connection db (select-entries)))
 (def ^:dynamic entries (load-entries))
-(def stores (load-stores))
+(def ^:dynamic stores (load-stores))
 
 (def table-header
   (list
@@ -142,8 +142,13 @@
                :selection-mode :dirs-only
                :success-fn (fn [fc file] (.getAbsolutePath file)))
         name (input "what name for the store?")]
-    (info "TODO: new store")))
-
+    (with-connection db
+      (do
+        (add-store name path)
+        (def ^:dynamic stores (load-stores))
+        (config! (element [:#stores]) :model (keys stores))
+        (def ^:dynamic entries (select-store (:path (selected-store))))
+        (fill-table)))))
 
 (defn file-add [e] (select-new-store))
 (defn file-backup [e] (backup!))
@@ -199,8 +204,11 @@
     (let [path (:store (selected-store))
           result (with-connection db (rescan path))]
       (invoke-later
-        (alert :text (str "rescan done...: " result))
-        (config! (element [:#main-panel]) :cursor :default)))))
+        (with-connection db
+          (alert :text (str "rescan done...: " result))
+          (config! (element [:#main-panel]) :cursor :default)
+          (def ^:dynamic entries (select-store (:path (selected-store))))
+          (fill-table))))))
 
 (defn on-rescan [e] (non-blocking-rescan))
 
